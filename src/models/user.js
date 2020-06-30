@@ -2,7 +2,7 @@ const mongoose = require("mongoose")
 const validator = require("validator")
 const bcrypt = require('bcryptjs')
 const jwt = require('jsonwebtoken')
-
+const Task = require('./task')
 //ACCESS SCHEMA
 const Schema = mongoose.Schema
 
@@ -48,7 +48,12 @@ const userSchema = new Schema({
       type: String,
       required: true
     }
-  }]
+  }],
+  avatar:{
+    type: Buffer
+  }
+},{
+  timestamps: true
 })
 
 userSchema.virtual('tasks', {
@@ -59,7 +64,7 @@ userSchema.virtual('tasks', {
 
 userSchema.methods.generateAuthToken = async function(){
   const user = this
-  const token = jwt.sign({ _id: user._id.toString() }, 'task-manager-app')
+  const token = jwt.sign({ _id: user._id.toString() }, process.env.JWT_SECRET)
   user.tokens = user.tokens.concat({token})
   await user.save()
   return token
@@ -71,6 +76,7 @@ userSchema.methods.toJSON = function(){
   const userObject = user.toObject()
   delete userObject.password
   delete userObject.tokens
+  delete userObject.avatar
   return userObject
 }
 
@@ -97,6 +103,16 @@ userSchema.pre('save', async function(next){
   }
   next()    //next is important
 })
+
+//middleware to delete all tasks of a user when a user is removed
+userSchema.pre('remove', async function(next){
+  const user = this
+  await Task.deleteMany({owner: user._id})
+  next()
+})
+
+
+
 
 // //CREATE A MODEL
 const User = mongoose.model('User', userSchema)
